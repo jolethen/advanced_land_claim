@@ -16,5 +16,7 @@ safe_dofile("enter_notify.lua")
 safe_dofile("protection.lua")
 safe_dofile("commands.lua")
 safe_dofile("help.lua")
+safe_dofile("utils.lua")
+safe_dofile("storage.lua")
 
 minetest.log("action", "[advanced_land_claim] Mod fully initialized.")
