@@ -11,10 +11,10 @@ local function safe_dofile(fname)
 end
 
 safe_dofile("config.lua")
-safe_dofile("storage.lua")
-safe_dofile("utils.lua")
+safe_dofile("empire.lua")
+safe_dofile("enter_notify.lua")
 safe_dofile("protection.lua")
 safe_dofile("commands.lua")
-safe_dofile("showclaim.lua")
+safe_dofile("help.lua")
 
 minetest.log("action", "[advanced_land_claim] Mod fully initialized.")
