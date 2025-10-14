@@ -32,7 +32,7 @@ local function set_help(key, text)
     storage:set_string(key, text or "")
 end
 
-minetest.register_chatcommand("help", {
+minetest.register_chatcommand("emchelp", {
     params = "<topic>",
     description = "Show help topics (claims, empire)",
     func = function(name, param)
