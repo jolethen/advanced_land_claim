@@ -125,24 +125,52 @@ minetest.register_chatcommand("claim_confirm", {
 
 -- unclaim
 minetest.register_chatcommand("unclaim", {
-    params = "<id>",
-    description = "Remove a claim you own (admins may remove any)",
-    func = function(name, param)
-        local id = tonumber(param)
-        if not id then return false, "Usage: /unclaim <id>" end
-        local claim, owner = get_claim_by_id(id)
-        if not claim then return false, "Claim not found." end
-        if owner ~= name and not player_is_admin(name) then return false, "You don't own this claim." end
-        for i,c in ipairs(CLAIMS[owner] or {}) do
-            if c.id == id then table.remove(CLAIMS[owner], i); break end
+    description = "Remove ONLY your own claim",
+    privs = {interact = true},
+
+    func = function(name)
+        local player = minetest.get_player_by_name(name)
+        if not player then
+            return false, "Player not found."
         end
-        if claim.type == "empire" and claim.empire and EMPIRES[claim.empire] and EMPIRES[claim.empire].claims then
-            for i,v in ipairs(EMPIRES[claim.empire].claims) do if v == id then table.remove(EMPIRES[claim.empire].claims, i); break end end
+
+        local pos = player:get_pos()
+        if not pos then
+            return false, "Position error."
         end
-        save_claims()
-        return true, "❌ Claim #" .. tostring(id) .. " removed."
+
+        local claim = get_claim_at(pos)
+        if not claim then
+            return false, "You are not inside a claim."
+        end
+
+        -- STRICT ownership check
+        local privs = minetest.get_player_privs(name) or {}
+        if claim.owner ~= name and not privs.claimer then
+            return false, "⛔ You can only unclaim land YOU protected."
+        end
+
+        -- SAFE removal (no assumptions)
+        for owner, list in pairs(DATA.claims or {}) do
+            if type(list) == "table" then
+                for i = #list, 1, -1 do
+                    if list[i] == claim then
+                        table.remove(list, i)
+                        minetest.chat_send_player(
+                            name,
+                            "✅ Your claim #" .. tostring(claim.id) .. " has been removed."
+                        )
+                        return true
+                    end
+                end
+            end
+        end
+
+        return false, "Claim exists but could not be removed."
     end
 })
+
+    
 
 -- addplayer (owner or admin)
 minetest.register_chatcommand("addplayer", {
