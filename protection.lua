@@ -1,130 +1,104 @@
--- ===============================
--- PROTECTION SYSTEM (CRASH-PROOF)
--- ===============================
+-- =========================
+-- PROTECTION SYSTEM
+-- =========================
 
--- SAFETY: ensure DATA exists
-DATA = DATA or {}
-DATA.claims = DATA.claims or {}
-DATA.allowed_em = DATA.allowed_em or {}
-DATA.empires = DATA.empires or {}
+-- Keep original engine protection (for other mods)
+local old_is_protected = minetest.is_protected
 
--- -------------------------------
--- Helper: claimer priv check
--- -------------------------------
-local function has_claimer_priv(name)
-    return (minetest.get_player_privs(name) or {}).claimer == true
+-- Utility: check bypass
+local function has_bypass(name)
+    local privs = minetest.get_player_privs(name) or {}
+    return privs.claimer == true
 end
 
--- ---------------------------------------
--- Get claim at position (SAFE & GLOBAL)
--- ---------------------------------------
-function get_claim_at(pos)
-    if not pos then return nil end
-    if not DATA or not DATA.claims then return nil end
+-- Utility: is player allowed in claim
+local function is_player_allowed(claim, name)
+    if not claim or not name then return false end
 
-    for owner, list in pairs(DATA.claims) do
-        if type(list) == "table" then
-            for _, claim in ipairs(list) do
-                if claim
-                and claim.pos1
-                and claim.pos2
-                and pos.x >= claim.pos1.x and pos.x <= claim.pos2.x
-                and pos.y >= claim.pos1.y and pos.y <= claim.pos2.y
-                and pos.z >= claim.pos1.z and pos.z <= claim.pos2.z then
-                    return claim
-                end
-            end
-        end
-    end
-
-    return nil
-end
-
--- ---------------------------------------
--- Protection check (dig/place)
--- ---------------------------------------
-minetest.register_on_protect(function(pos, name)
-    -- Admin bypass
-    if has_claimer_priv(name) then
-        return true
-    end
-
-    local claim = get_claim_at(pos)
-    if not claim then
-        return false -- not protected
-    end
-
-    -- Owner always allowed
+    -- Owner
     if claim.owner == name then
         return true
     end
 
-    -- Personal shared access
+    -- Shared players
     if claim.shared and claim.shared[name] then
         return true
     end
 
-    -- Empire claim logic
+    -- Empire logic
     if claim.type == "empire" and claim.empire then
-        local empire = DATA.empires[claim.empire]
-        if not empire then
-            return false
-        end
+        local empires = DATA.empires or {}
+        local emp = empires[claim.empire]
 
-        -- Empire owner or staff
-        if empire.owner == name then
-            return true
-        end
-        if empire.staff and empire.staff[name] then
-            return true
-        end
-
-        -- /allow_em permissions
-        local allowed = DATA.allowed_em[claim.empire]
-        if allowed then
-            -- everyone allowed everywhere
-            if allowed.all and allowed.all == true then
+        if emp then
+            -- Owner of empire
+            if emp.owner == name then
                 return true
             end
 
-            -- specific player rules
-            local p = allowed[name]
-            if p then
-                if p == true or p == "all" then
+            -- Member access
+            if emp.members and emp.members[name] then
+                -- Claim allows all empire members
+                if claim.empire_access == "all" then
                     return true
                 end
-                if type(p) == "table" then
-                    for _, cid in ipairs(p) do
-                        if cid == claim.id then
-                            return true
-                        end
-                    end
+
+                -- Claim allows specific empire players
+                if claim.empire_allowed and claim.empire_allowed[name] then
+                    return true
                 end
             end
         end
     end
 
     return false
-end)
+end
 
--- ---------------------------------------
--- Protection violation message
--- ---------------------------------------
+-- =========================
+-- CORE ENGINE HOOK
+-- =========================
+function minetest.is_protected(pos, name)
+    -- Safety
+    if not pos or not name or name == "" then
+        return true
+    end
+
+    -- Admin bypass
+    if has_bypass(name) then
+        return false
+    end
+
+    -- Get claim
+    local claim = get_claim_at(pos)
+
+    -- No claim → fallback to other mods
+    if not claim then
+        return old_is_protected(pos, name)
+    end
+
+    -- Allowed player
+    if is_player_allowed(claim, name) then
+        return false
+    end
+
+    -- Otherwise BLOCK
+    return true
+end
+
+-- =========================
+-- MESSAGE ON VIOLATION
+-- =========================
 minetest.register_on_protection_violation(function(pos, name)
+    if not pos or not name then return end
+
     local claim = get_claim_at(pos)
     if not claim then return end
 
-    if claim.type == "empire" and claim.empire then
-        minetest.chat_send_player(
-            name,
-            "⚠ You are inside Empire land: " ..
-            claim.empire .. " (Claim #" .. tostring(claim.id) .. ")"
-        )
-    else
-        minetest.chat_send_player(
-            name,
-            "⚠ This land is owned by " ..
-            claim.owner .. " (Claim #" .. tostring(claim.id) .. ")"
-        )
-    end
+    local owner = claim.owner or "unknown"
+    local cid = claim.id and tostring(claim.id) or "?"
+
+    minetest.chat_send_player(
+        name,
+        "⚠ This land is owned by " .. owner .. " (Claim #" .. cid .. ")"
+    )
 end)
