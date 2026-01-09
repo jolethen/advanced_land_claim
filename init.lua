@@ -1,22 +1,27 @@
-local modname = minetest.get_current_modname()
-local modpath = minetest.get_modpath(modname)
+local modpath = minetest.get_modpath(minetest.get_current_modname())
 
-local function safe_dofile(fname)
-    local ok, err = pcall(dofile, modpath.."/"..fname)
+local function safe_dofile(file)
+    local path = modpath .. "/" .. file
+    local ok, err = pcall(dofile, path)
     if not ok then
-        minetest.log("error", "[advanced_land_claim] Failed to load "..fname..": "..tostring(err))
-    else
-        minetest.log("action", "[advanced_land_claim] Loaded "..fname)
+        minetest.log("error", "[advanced_land_claim] Failed loading " .. file .. ": " .. err)
     end
 end
 
+-- CONFIG FIRST
 safe_dofile("config.lua")
-safe_dofile("empire.lua")
-safe_dofile("enter_notify.lua")
-safe_dofile("protection.lua")
-safe_dofile("commands.lua")
-safe_dofile("help.lua")
-safe_dofile("utils.lua")
+
+-- STORAGE MUST BE FIRST (DATA, CLAIMS, EMPIRES)
 safe_dofile("storage.lua")
 
-minetest.log("action", "[advanced_land_claim] Mod fully initialized.")
+-- UTILS NEXT (functions used everywhere)
+safe_dofile("utils.lua")
+
+-- CORE LOGIC
+safe_dofile("empire.lua")
+safe_dofile("protection.lua")
+safe_dofile("enter_notify.lua")
+
+-- COMMANDS LAST (they depend on everything above)
+safe_dofile("commands.lua")
+safe_dofile("help.lua")
