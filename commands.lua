@@ -170,29 +170,48 @@ minetest.register_chatcommand("unclaim", {
     end
 })
 
+-- add_player
     
 
--- addplayer (owner or admin)
-minetest.register_chatcommand("addplayer", {
-    params = "<claimid> <player1> [player2 ...]",
-    description = "Add players to a claim's allowed list",
+minetest.register_chatcommand("add_player", {
+    params = "<claim_id> <player>",
+    description = "Allow a player to build in your claim",
+    privs = {interact = true},
+
     func = function(name, param)
-        local idstr, rest = param:match("^(%d+)%s*(.*)$")
-        local id = tonumber(idstr)
-        if not id or not rest or rest:match("^%s*$") then return false, "Usage: /addplayer <claimid> <player1> [player2 ...]" end
-        local claim, owner = get_claim_by_id(id)
-        if not claim then return false, "Claim not found." end
-        if owner ~= name and not player_is_admin(name) then return false, "You must own the claim or be admin." end
-        claim.shared = claim.shared or {}
-        local added = {}
-        for pname in rest:gmatch("(%S+)") do
-            claim.shared[pname] = true
-            table.insert(added, pname)
+        local id, target = param:match("^(%d+)%s+(%S+)$")
+        id = tonumber(id)
+
+        if not id or not target then
+            return false, "Usage: /add_player <claim_id> <player>"
         end
+
+        if not minetest.player_exists(target) then
+            return false, "Player does not exist."
+        end
+
+        local claim = get_claim_by_id(id)
+        if not claim then
+            return false, "Claim ID not found."
+        end
+
+        if claim.owner ~= name then
+            return false, "Only the claim owner can add players."
+        end
+
+        claim.shared = claim.shared or {}
+
+        if claim.shared[target] then
+            return false, target .. " is already allowed."
+        end
+
+        claim.shared[target] = true
         save_claims()
-        return true, "Added to claim #"..id..": "..table.concat(added, ", ")
+
+        return true, "Added " .. target .. " to claim #" .. id
     end
 })
+
 
 -- removeplayer (owner or admin)
 minetest.register_chatcommand("removeplayer", {
