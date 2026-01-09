@@ -170,47 +170,46 @@ minetest.register_chatcommand("unclaim", {
     end
 })
 
--- add_player
-    
+-- addplayer
 
-minetest.register_chatcommand("add_player", {
-    params = "<claim_id> <player>",
-    description = "Allow a player to build in your claim",
-    privs = {interact = true},
-
+minetest.register_chatcommand("addplayer", {
+    params = "<claimid> <player1> [player2 ...]",
+    description = "Add players to a claim's allowed list",
     func = function(name, param)
-        local id, target = param:match("^(%d+)%s+(%S+)$")
-        id = tonumber(id)
+        local idstr, rest = param:match("^(%d+)%s*(.*)$")
+        local id = tonumber(idstr)
 
-        if not id or not target then
-            return false, "Usage: /add_player <claim_id> <player>"
+        if not id or not rest or rest:match("^%s*$") then
+            return false, "Usage: /addplayer <claimid> <player1> [player2 ...]"
         end
 
-        if not minetest.player_exists(target) then
-            return false, "Player does not exist."
-        end
-
-        local claim = get_claim_by_id(id)
+        local claim, owner = get_claim_by_id(id)
         if not claim then
-            return false, "Claim ID not found."
+            return false, "Claim not found."
         end
 
-        if claim.owner ~= name then
-            return false, "Only the claim owner can add players."
+        if owner ~= name and not player_is_admin(name) then
+            return false, "You must own the claim or be admin."
         end
 
-        claim.shared = claim.shared or {}
-
-        if claim.shared[target] then
-            return false, target .. " is already allowed."
+        -- HARD SAFETY (prevents crashes)
+        if type(claim.shared) ~= "table" then
+            claim.shared = {}
         end
 
-        claim.shared[target] = true
+        local added = {}
+
+        for pname in rest:gmatch("(%S+)") do
+            claim.shared[pname] = true
+            table.insert(added, pname)
+        end
+
         save_claims()
 
-        return true, "Added " .. target .. " to claim #" .. id
+        return true, "Added to claim #" .. id .. ": " .. table.concat(added, ", ")
     end
 })
+
 
 
 -- removeplayer (owner or admin)
